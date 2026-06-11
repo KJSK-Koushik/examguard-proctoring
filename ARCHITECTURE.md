@@ -2,7 +2,7 @@
 
 ExamGuard is a local desktop proctoring prototype built with Tkinter, OpenCV,
 MediaPipe, and lightweight rule-based alerting. The application captures webcam
-frames, analyzes face presence and motion, updates the dashboard, and writes
+frames, analyzes face presence and motion, updates a clean dashboard, and writes
 session evidence to local logs.
 
 ## Runtime Flow
@@ -24,7 +24,8 @@ During a session, the dashboard starts a background processing thread:
 Camera frame
   -> resize to configured frame size
   -> motion detection every frame
-  -> face detection every third frame
+  -> MediaPipe face detection every third frame
+  -> Haar fallback if MediaPipe/model is unavailable
   -> alert evaluation with sustained-frame confirmation
   -> CSV/screenshot logging for fired alerts
   -> clean camera feed + compact status indicators in UI
@@ -53,11 +54,23 @@ Produces a `FaceAnalysis` object for each processed frame.
 
 Primary backend:
 
-- MediaPipe Tasks FaceDetector with `models/blaze_face_short_range.tflite`.
+- MediaPipe Tasks FaceDetector with the local BlazeFace model:
+  `models/blaze_face_short_range.tflite`.
 
 Fallback backend:
 
 - OpenCV Haar cascades for frontal and side-profile faces.
+
+Backend selection is configured in `config/settings.py`:
+
+```python
+FACE_DETECTOR_BACKEND = "mediapipe"
+MEDIAPIPE_FACE_MODEL_PATH = "models/blaze_face_short_range.tflite"
+MEDIAPIPE_FACE_MIN_CONFIDENCE = 0.55
+```
+
+The MediaPipe detector is the normal path. Haar is only a fallback path when
+MediaPipe is unavailable or the local model cannot be loaded.
 
 The detector returns:
 
@@ -119,6 +132,9 @@ The UI keeps compact operational feedback:
 - session stats
 - single-line status messages
 
+The internal risk score still exists for alerting and reports, but it is not
+shown as a dashboard card.
+
 ### `ui/report_generator.py`
 
 Writes local session artifacts under `logs/`.
@@ -154,7 +170,8 @@ models/blaze_face_short_range.tflite
 ```
 
 This model is small enough to keep in the repository and allows the app to run
-without downloading model assets at startup.
+without downloading model assets at startup. It was added so multiple-face
+detection is more reliable than the older Haar-only approach.
 
 ## Testing
 
@@ -168,3 +185,10 @@ The suite validates imports, dashboard source structure, motion detection, face
 detection, alert behavior, reporting, integrated pipeline behavior, and camera
 lifecycle.
 
+Current verified test result:
+
+```text
+PASSED : 39
+FAILED : 0
+TOTAL  : 39
+```

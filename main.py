@@ -3,7 +3,7 @@ main.py — Entry point for the ExamGuard Proctoring System.
 
 Usage:
     python main.py
-    python main.py --student "Alice Johnson"
+    python main.py --student "Harika"
 """
 
 import sys
