@@ -261,6 +261,61 @@ class ProctoringDashboard:
         )
         self._status_msg_lbl.pack(fill="x", pady=(2, 0))
 
+        # ── Risk score card ────────────────────────────────────────────────────
+        risk_card = tk.Frame(right, bg=C["card"], bd=0,
+                             highlightthickness=1,
+                             highlightbackground=C["border"])
+        risk_card.pack(fill="x", pady=(4, 8))
+
+        tk.Label(risk_card, text="RISK SCORE", font=self._f_label,
+                 bg=C["card"], fg=C["text_dim"]).pack(anchor="w", padx=14, pady=(10, 4))
+
+        risk_row = tk.Frame(risk_card, bg=C["card"])
+        risk_row.pack(fill="x", padx=14, pady=(0, 10))
+
+        self._risk_score_var = tk.StringVar(value="0")
+        tk.Label(risk_row, textvariable=self._risk_score_var,
+                 font=tkfont.Font(family=settings.FONT_FAMILY, size=28, weight="bold"),
+                 bg=C["card"], fg=C["text"]).pack(side="left")
+
+        self._risk_level_var = tk.StringVar(value="🟢 LOW")
+        self._risk_level_lbl = tk.Label(risk_row, textvariable=self._risk_level_var,
+                                        font=self._f_body,
+                                        bg=C["card"], fg=C["green"])
+        self._risk_level_lbl.pack(side="left", padx=(14, 0))
+
+        # ── Recent alerts log ──────────────────────────────────────────────────
+        log_card = tk.Frame(right, bg=C["card"], bd=0,
+                            highlightthickness=1,
+                            highlightbackground=C["border"])
+        log_card.pack(fill="both", expand=True)
+
+        tk.Label(log_card, text="RECENT ALERTS", font=self._f_label,
+                 bg=C["card"], fg=C["text_dim"]).pack(anchor="w", padx=14, pady=(10, 4))
+
+        log_inner = tk.Frame(log_card, bg=C["card"])
+        log_inner.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        self._log_text = tk.Text(
+            log_inner,
+            bg=C["bg"], fg=C["text"],
+            font=self._f_mono,
+            state="disabled",
+            relief="flat",
+            wrap="word",
+            height=8,
+        )
+        _scrollbar = tk.Scrollbar(log_inner, command=self._log_text.yview)
+        self._log_text.configure(yscrollcommand=_scrollbar.set)
+        _scrollbar.pack(side="right", fill="y")
+        self._log_text.pack(side="left", fill="both", expand=True)
+
+        self._log_text.tag_configure("low",      foreground=C["text_dim"])
+        self._log_text.tag_configure("medium",   foreground=C["yellow"])
+        self._log_text.tag_configure("high",     foreground=C["orange"])
+        self._log_text.tag_configure("critical", foreground=C["red"])
+        self._log_text.tag_configure("ts",       foreground="#484f58")
+
         # ── Show placeholder on canvas ─────────────────────────────────────────
         self._draw_placeholder()
 
@@ -448,9 +503,26 @@ class ProctoringDashboard:
         high_count = sum(1 for e in all_events if e.severity == "high")
         self._high_alerts_var.set(str(high_count))
 
+        risk  = result["risk"]
+        score = result["score"]
+        self._risk_score_var.set(str(score))
+        self._risk_level_var.set(f"{risk.emoji} {risk.label}")
+        self._risk_level_lbl.configure(fg=RISK_COLOURS.get(risk.label, C["text"]))
+
+        for event in result["new_events"]:
+            ts = datetime.datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S")
+            self._append_log(ts, event.label, event.severity)
+
         if result["new_events"]:
             latest = result["new_events"][-1]
             self._set_status(f"Latest alert: {latest.label}", latest.severity)
+
+    def _append_log(self, ts: str, label: str, severity: str):
+        self._log_text.configure(state="normal")
+        self._log_text.insert("end", f"[{ts}] ", "ts")
+        self._log_text.insert("end", f"{label}\n", severity)
+        self._log_text.see("end")
+        self._log_text.configure(state="disabled")
 
     def _update_canvas(self, frame: np.ndarray):
         """Convert BGR frame → Tkinter PhotoImage and put on canvas."""

@@ -30,6 +30,8 @@ class CameraManager:
         self._lock   = threading.Lock()
         self._running = False
         self._thread  = None
+        self._using_emulator = False
+        self._emulator_src   = None
 
         # Actual dimensions reported by the driver (may differ from requested)
         self.width  = settings.FRAME_WIDTH
@@ -39,29 +41,95 @@ class CameraManager:
 
     def start(self) -> bool:
         """Open the camera and begin capturing. Returns True on success."""
-        self._cap = self._open_capture()
-        if not self._cap.isOpened():
+        sources_to_try = [self._source]
+        if isinstance(self._source, int):
+            # If the requested index fails, try other common camera indices
+            for idx in range(9):
+                if idx != self._source:
+                    sources_to_try.append(idx)
+
+        # Check if user explicitly asked for the emulator source
+        if self._source == "emulator":
+            return self._start_emulator_source()
+
+        for src in sources_to_try:
+            self._source = src
+            self._cap = self._open_capture()
+            if not self._cap or not self._cap.isOpened():
+                if self._cap is not None:
+                    self._cap.release()
+                    self._cap = None
+                continue
+
+            self._cap.set(cv2.CAP_PROP_FRAME_WIDTH,  settings.FRAME_WIDTH)
+            self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.FRAME_HEIGHT)
+            self._cap.set(cv2.CAP_PROP_FPS,          settings.TARGET_FPS)
+
+            # Read back actual dimensions
+            self.width  = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+            self._running = True
+            self._thread  = threading.Thread(target=self._capture_loop,
+                                             daemon=True, name="CameraThread")
+            self._thread.start()
+
+            # Warmup / check if we get a valid frame
+            deadline = time.time() + 1.2
+            frame_ok = False
+            while time.time() < deadline:
+                if self.read() is not None:
+                    frame_ok = True
+                    break
+                time.sleep(0.03)
+
+            if frame_ok:
+                print(f"[Camera] Successfully initialized camera source: {self._source}")
+                return True
+            else:
+                print(f"[Camera] Source {self._source} opened but failed to return frames. Trying next...")
+                self.stop()
+
+        # ── Emulator fallback ────────────────────────────────────────────────
+        if getattr(settings, "EMULATOR_CAMERA_FALLBACK", False):
+            print("[Camera] No physical camera found. Trying Android emulator via ADB...")
+            return self._start_emulator_source()
+
+        return False
+
+    def _start_emulator_source(self) -> bool:
+        """Try to use the Android emulator's screen as a camera source via ADB."""
+        try:
+            from tools.emulator_camera import EmulatorCameraSource, is_emulator_available
+        except ImportError:
+            print("[Camera] emulator_camera module not found.")
             return False
 
-        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH,  settings.FRAME_WIDTH)
-        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.FRAME_HEIGHT)
-        self._cap.set(cv2.CAP_PROP_FPS,          settings.TARGET_FPS)
+        if not is_emulator_available():
+            print("[Camera] No Android emulator detected via ADB.")
+            return False
 
-        # Read back actual dimensions
-        self.width  = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self._emulator_src = EmulatorCameraSource()
+        if not self._emulator_src.start():
+            print("[Camera] Failed to start emulator camera capture.")
+            return False
 
+        # Bridge: poll the emulator source in our own read path
+        self._using_emulator = True
         self._running = True
-        self._thread  = threading.Thread(target=self._capture_loop,
-                                         daemon=True, name="CameraThread")
+        self.width = self._emulator_src.width
+        self.height = self._emulator_src.height
+        self._source = self._emulator_src.source
+
+        # Start a thread that copies frames from the emulator source
+        self._thread = threading.Thread(
+            target=self._emulator_bridge_loop, daemon=True, name="EmulatorBridge"
+        )
         self._thread.start()
 
-        deadline = time.time() + 1.0
-        while time.time() < deadline:
-            if self.read() is not None:
-                break
-            time.sleep(0.03)
+        print(f"[Camera] Using Android emulator camera ({self._source})")
         return True
+
 
     @property
     def source(self):
@@ -84,15 +152,17 @@ class CameraManager:
 
     def _open_capture(self):
         if isinstance(self._source, int):
-            cap = cv2.VideoCapture(self._source, cv2.CAP_DSHOW)
-            if not cap.isOpened():
+            # Try Windows backends in a robust order for webcams and virtual cameras.
+            for backend in (cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY):
+                cap = cv2.VideoCapture(self._source, backend)
+                if cap.isOpened():
+                    return cap
                 cap.release()
-                cap = cv2.VideoCapture(self._source)
-            return cap
+            return cv2.VideoCapture(self._source)
 
+        # For file paths / stream URLs, try the default backend first and then FFMPEG.
         cap = cv2.VideoCapture(self._source)
         if not cap.isOpened():
-            # Fallback: try without backend flag (Linux / macOS)
             cap.release()
             cap = cv2.VideoCapture(self._source, cv2.CAP_FFMPEG)
         return cap
@@ -112,6 +182,10 @@ class CameraManager:
         if self._cap:
             self._cap.release()
             self._cap = None
+        if self._emulator_src:
+            self._emulator_src.stop()
+            self._emulator_src = None
+            self._using_emulator = False
 
     @property
     def is_running(self) -> bool:
@@ -132,3 +206,12 @@ class CameraManager:
                 frame = cv2.resize(frame, (settings.FRAME_WIDTH, settings.FRAME_HEIGHT))
             with self._lock:
                 self._frame = frame
+
+    def _emulator_bridge_loop(self):
+        """Bridge loop: copies frames from EmulatorCameraSource into self._frame."""
+        while self._running and self._emulator_src:
+            frame = self._emulator_src.read()
+            if frame is not None:
+                with self._lock:
+                    self._frame = frame
+            time.sleep(0.05)  # ~20 FPS polling

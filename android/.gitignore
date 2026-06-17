@@ -1,0 +1,20 @@
+# Gradle / Android build artifacts
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+keystore.properties
+
+# Generated reports/screenshots captured during emulator verification
+docs/screen_*.png
+
+# IDE
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/

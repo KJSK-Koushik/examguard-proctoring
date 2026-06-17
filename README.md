@@ -131,8 +131,12 @@ python test_system.py
 ## Android Emulator Camera Testing
 
 This project is a Python desktop proctoring app, so it does not install inside
-Android. To test with Android Studio Emulator, use the emulator's virtual camera
-as an OpenCV camera source on your laptop.
+Android or run inside the emulator. The emulator is only useful as a source of
+virtual camera input to Windows, not as the host for ExamGuard itself.
+
+If you want to test with the emulator, configure the emulator camera to expose a
+virtual webcam and then point ExamGuard at the corresponding Windows camera
+index.
 
 ### 1. Configure the emulator camera
 

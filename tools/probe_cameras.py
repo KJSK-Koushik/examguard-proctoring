@@ -14,27 +14,36 @@ import cv2
 
 
 def probe_index(index: int, warmup_secs: float = 0.25) -> tuple[bool, str]:
-    cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-    backend = "CAP_DSHOW"
-    if not cap.isOpened():
+    backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
+    for backend in backends:
+        cap = cv2.VideoCapture(index, backend)
+        label = f"backend {backend}"
+        if not cap.isOpened():
+            cap.release()
+            continue
+
+        time.sleep(warmup_secs)
+        ok, frame = cap.read()
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
         cap.release()
-        cap = cv2.VideoCapture(index)
-        backend = "default"
 
-    if not cap.isOpened():
-        return False, "not available"
+        if ok and frame is not None:
+            return True, f"{width}x{height} @ {fps:.1f} fps via {label}"
 
-    time.sleep(warmup_secs)
-    ok, frame = cap.read()
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    cap.release()
-
-    if not ok or frame is None:
-        return False, f"opened via {backend}, but no frame returned"
-
-    return True, f"{width}x{height} @ {fps:.1f} fps via {backend}"
+    # fallback to generic open attempt for non-index sources
+    cap = cv2.VideoCapture(index)
+    if cap.isOpened():
+        time.sleep(warmup_secs)
+        ok, frame = cap.read()
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        if ok and frame is not None:
+            return True, f"{width}x{height} @ {fps:.1f} fps via fallback generic backend"
+    return False, "not available"
 
 
 def main() -> int:

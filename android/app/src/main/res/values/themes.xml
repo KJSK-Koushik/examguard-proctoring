@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Base theme applied before Compose draws. Kept minimal and framework-only
+      so we don't need the AppCompat/Material View libraries. Compose supplies
+      the real Material3 theming at runtime.
+    -->
+    <style name="Theme.ExamGuard" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

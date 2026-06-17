@@ -77,4 +77,21 @@ echo.
 echo To find your camera index (if camera fails):
 echo   python tools\probe_cameras.py --max-index 8
 echo.
+echo ============================================
+echo   Android Emulator Mode (optional)
+echo ============================================
+echo.
+adb version >nul 2>&1
+if errorlevel 1 (
+    echo [WARNING] ADB not found on PATH.
+    echo           To use Android emulator as camera input you need ADB.
+    echo           Install Android Studio, then add platform-tools to PATH:
+    echo           e.g. C:\Users\YourName\AppData\Local\Android\Sdk\platform-tools
+    echo           Then use run_emulator.bat instead of run.bat.
+) else (
+    echo [OK] ADB found. To run with Android emulator as camera:
+    echo        1. Start an AVD from Android Studio
+    echo        2. Double-click run_emulator.bat
+)
+echo.
 pause

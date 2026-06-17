@@ -7,6 +7,7 @@ All tunable parameters live here so you never need to hunt through source files.
 #  CAMERA
 # ─────────────────────────────────────────────
 CAMERA_INDEX        = 0        # 0 = default webcam
+EMULATOR_CAMERA_FALLBACK = True  # Enable fallback when no camera detected (e.g., Android emulator)
 CAMERA_SOURCE       = None     # int index, video file path, or stream URL
 FRAME_WIDTH         = 640
 FRAME_HEIGHT        = 480
