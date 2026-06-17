@@ -66,7 +66,7 @@ class ProctoringDashboard:
 
     # ─── Initialisation ───────────────────────────────────────────────────────
 
-    def __init__(self, root: tk.Tk, student_name: str = "Student"):
+    def __init__(self, root: tk.Tk, student_name: str = "Student", camera_source=None):
         self._root         = root
         self._student_name = student_name
         self._start_time   = time.time()
@@ -77,7 +77,7 @@ class ProctoringDashboard:
         self._frame_queue: queue.Queue = queue.Queue(maxsize=2)
 
         # Core modules
-        self._camera   = CameraManager()
+        self._camera   = CameraManager(camera_source=camera_source)
         self._motion   = MotionDetector()
         self._face     = FaceDetector()
         self._alert    = AlertEngine()

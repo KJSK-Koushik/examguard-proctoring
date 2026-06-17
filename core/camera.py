@@ -5,6 +5,7 @@ Runs the capture loop in a daemon thread and exposes the latest
 frame (plus raw dimensions) to consumers via a thread-safe property.
 """
 
+import os
 import threading
 import time
 import cv2
@@ -22,8 +23,8 @@ class CameraManager:
         cam.stop()
     """
 
-    def __init__(self, camera_index: int = settings.CAMERA_INDEX):
-        self._index  = camera_index
+    def __init__(self, camera_index: int = settings.CAMERA_INDEX, camera_source=None):
+        self._source = self._resolve_source(camera_index, camera_source)
         self._cap    = None
         self._frame  = None
         self._lock   = threading.Lock()
@@ -38,10 +39,7 @@ class CameraManager:
 
     def start(self) -> bool:
         """Open the camera and begin capturing. Returns True on success."""
-        self._cap = cv2.VideoCapture(self._index, cv2.CAP_DSHOW)
-        if not self._cap.isOpened():
-            # Fallback: try without backend flag (Linux / macOS)
-            self._cap = cv2.VideoCapture(self._index)
+        self._cap = self._open_capture()
         if not self._cap.isOpened():
             return False
 
@@ -64,6 +62,40 @@ class CameraManager:
                 break
             time.sleep(0.03)
         return True
+
+    @property
+    def source(self):
+        return self._source
+
+    @staticmethod
+    def _resolve_source(camera_index, camera_source):
+        source = camera_source
+        if source is None:
+            source = getattr(settings, "CAMERA_SOURCE", None)
+        if source is None:
+            env_source = os.getenv("EXAMGUARD_CAMERA_SOURCE")
+            source = env_source if env_source else camera_index
+        if isinstance(source, str):
+            stripped = source.strip()
+            if stripped.lstrip("-").isdigit():
+                return int(stripped)
+            return stripped
+        return source
+
+    def _open_capture(self):
+        if isinstance(self._source, int):
+            cap = cv2.VideoCapture(self._source, cv2.CAP_DSHOW)
+            if not cap.isOpened():
+                cap.release()
+                cap = cv2.VideoCapture(self._source)
+            return cap
+
+        cap = cv2.VideoCapture(self._source)
+        if not cap.isOpened():
+            # Fallback: try without backend flag (Linux / macOS)
+            cap.release()
+            cap = cv2.VideoCapture(self._source, cv2.CAP_FFMPEG)
+        return cap
 
     def read(self):
         """Return the most-recently captured BGR frame, or None."""

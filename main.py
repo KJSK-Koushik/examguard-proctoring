@@ -7,6 +7,7 @@ Usage:
 """
 
 import sys
+import argparse
 import tkinter as tk
 from tkinter import messagebox
 
@@ -40,13 +41,22 @@ from ui.dashboard import ProctoringDashboard
 
 
 def main():
-    # Parse optional --student flag
-    student_name = "Student"
-    args = sys.argv[1:]
-    if "--student" in args:
-        idx = args.index("--student")
-        if idx + 1 < len(args):
-            student_name = args[idx + 1]
+    parser = argparse.ArgumentParser(
+        description="Run the ExamGuard desktop proctoring dashboard."
+    )
+    parser.add_argument("--student", default="Student", help="Student name for logs")
+    parser.add_argument(
+        "--camera",
+        "--camera-source",
+        dest="camera_source",
+        default=None,
+        help=(
+            "Camera source: Windows camera index such as 0 or 1, "
+            "a video file path, or a stream URL."
+        ),
+    )
+    args = parser.parse_args()
+    student_name = args.student
 
     # ── Ask for student name BEFORE creating the main window ─────────────────
     # Using a separate temporary root so the dialog doesn't block the main loop
@@ -75,7 +85,11 @@ def main():
     root.geometry(f"{win_w}x{win_h}+{x}+{y}")
     root.minsize(win_w, win_h)
 
-    app = ProctoringDashboard(root, student_name=student_name)
+    app = ProctoringDashboard(
+        root,
+        student_name=student_name,
+        camera_source=args.camera_source,
+    )
     root.protocol("WM_DELETE_WINDOW", app._on_quit)
     root.mainloop()
 

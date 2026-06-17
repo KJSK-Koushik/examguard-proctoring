@@ -110,9 +110,62 @@ pip install -r requirements.txt
 python main.py
 ```
 
+Use a specific camera source:
+
+```bash
+python main.py --camera 1
+python main.py --student "Harika" --camera 1
+```
+
+`--camera` accepts a Windows camera index (`0`, `1`, `2`), a video file path, or
+a stream URL. You can also set `EXAMGUARD_CAMERA_SOURCE` instead of passing the
+flag each time.
+
 ### 4. Run tests
 ```bash
 python test_system.py
+```
+
+---
+
+## Android Emulator Camera Testing
+
+This project is a Python desktop proctoring app, so it does not install inside
+Android. To test with Android Studio Emulator, use the emulator's virtual camera
+as an OpenCV camera source on your laptop.
+
+### 1. Configure the emulator camera
+
+In Android Studio:
+
+1. Open **Device Manager**.
+2. Edit your virtual device.
+3. Go to **Advanced settings**.
+4. Set **Camera > Front** or **Camera > Back** to `Webcam0` or another available
+   laptop/virtual camera.
+5. Start the emulator.
+
+### 2. Find the camera index visible to ExamGuard
+
+```bash
+python tools/probe_cameras.py --max-index 8
+```
+
+Look for an `OK index ...` row. If your normal webcam is index `0`, the emulator
+or virtual camera commonly appears as `1` or higher.
+
+### 3. Run ExamGuard against that source
+
+```bash
+python main.py --camera 1
+```
+
+If you use OBS, DroidCam, IP Webcam, or another virtual/stream camera, pass that
+source instead:
+
+```bash
+python main.py --camera "http://127.0.0.1:8080/video"
+python main.py --camera "sample_exam_feed.mp4"
 ```
 
 ---
@@ -123,6 +176,7 @@ All parameters are in [`config/settings.py`](config/settings.py). Key settings:
 
 ```python
 CAMERA_INDEX = 0          # Change if you have multiple cameras
+CAMERA_SOURCE = None      # Optional: index, video file, or stream URL
 
 MOG2_VAR_THRESHOLD = 50   # Motion sensitivity (lower = more sensitive)
 

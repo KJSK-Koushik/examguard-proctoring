@@ -162,7 +162,8 @@ class AlertEngine:
     def all_events(self) -> List[AlertEvent]:
         return list(self._events)
 
-    # ─── Internal ────────────────────────────────────────────────────────────
+    # ─── Internal ──────────────────────────────────
+    # ──────────────────────────
 
     def _try_fire(self, key: str, frame=None) -> Optional[AlertEvent]:
         """Fire an alert if the cooldown has expired."""

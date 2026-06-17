@@ -42,11 +42,22 @@ window, and starts the dashboard event loop.
 
 Owns webcam lifecycle through `CameraManager`.
 
-- Opens the configured camera index.
+- Opens the configured camera source.
+- Supports integer camera indexes, video files, and stream URLs.
 - Captures frames on a background thread.
 - Resizes frames to `FRAME_WIDTH` x `FRAME_HEIGHT`.
 - Waits briefly for the first valid frame during startup.
 - Returns thread-safe frame copies to the processing loop.
+
+The source can be selected with:
+
+```powershell
+python main.py --camera 1
+$env:EXAMGUARD_CAMERA_SOURCE="1"; python main.py
+```
+
+For Android Emulator testing, the emulator is treated as a local/virtual camera
+source exposed to Windows and then consumed by OpenCV.
 
 ### `core/face_detector.py`
 
@@ -154,6 +165,7 @@ All tunable values live in `config/settings.py`.
 Key groups:
 
 - camera size, FPS, and camera index
+- optional camera source override for emulator, virtual camera, stream, or file
 - motion thresholds and zones
 - MediaPipe/Haar face detection settings
 - sustained-frame alert confirmation thresholds
